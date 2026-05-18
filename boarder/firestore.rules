@@ -1,0 +1,144 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function isFriendWith(uid) {
+      // Check if an accepted friendRequest exists between the two users
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/friendRequests/$(request.auth.uid + '_' + uid)) ||
+        exists(/databases/$(database)/documents/friendRequests/$(uid + '_' + request.auth.uid))
+      );
+    }
+
+    function isNotBlocked(uid) {
+      return !exists(/databases/$(database)/documents/blockedUsers/$(request.auth.uid + '_' + uid)) &&
+             !exists(/databases/$(database)/documents/blockedUsers/$(uid + '_' + request.auth.uid));
+    }
+
+    // ── users ─────────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Anyone signed in can read user profiles (needed for map, search)
+      allow read: if isSignedIn();
+
+      // User can create their own document on registration
+      allow create: if isOwner(userId) && !request.resource.data.keys().hasAny(['isAdmin']);
+
+      // User can update their own document; isAdmin field is immutable by the user
+      allow update: if isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']);
+
+      // Admin can update and delete any user document
+      allow update, delete: if isAdmin();
+    }
+
+    // ── friendRequests ────────────────────────────────────────────────────────
+    match /friendRequests/{requestId} {
+      // Read: involved parties only
+      allow read: if isSignedIn() && (
+        resource.data.fromId == request.auth.uid ||
+        resource.data.toId == request.auth.uid
+      );
+
+      // Create: authenticated user can send a request FROM themselves
+      allow create: if isSignedIn() &&
+        request.resource.data.fromId == request.auth.uid &&
+        request.resource.data.toId != request.auth.uid &&
+        request.resource.data.status == 'pending';
+
+      // Update: recipient can accept/deny; sender can cancel (delete)
+      allow update: if isSignedIn() && (
+        resource.data.toId == request.auth.uid ||
+        resource.data.fromId == request.auth.uid
+      );
+
+      // Delete: either party can delete (unfriend / cancel request)
+      allow delete: if isSignedIn() && (
+        resource.data.fromId == request.auth.uid ||
+        resource.data.toId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ── blockedUsers ──────────────────────────────────────────────────────────
+    match /blockedUsers/{blockId} {
+      // Only the blocker can read their own block records
+      allow read: if isSignedIn() && resource.data.blockerId == request.auth.uid;
+
+      // Only the blocker can create a block
+      allow create: if isSignedIn() && request.resource.data.blockerId == request.auth.uid;
+
+      // Only the blocker can delete (unblock)
+      allow delete: if isSignedIn() && resource.data.blockerId == request.auth.uid;
+
+      // Admins can manage all blocks
+      allow read, write: if isAdmin();
+    }
+
+    // ── messages ──────────────────────────────────────────────────────────────
+    match /messages/{messageId} {
+      // Only involved parties can read
+      allow read: if isSignedIn() && (
+        resource.data.senderId == request.auth.uid ||
+        resource.data.receiverId == request.auth.uid
+      );
+
+      // Only authenticated users can send; sender must be themselves
+      allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid;
+
+      // No editing messages
+      allow update: if false;
+
+      // Sender or admin can delete
+      allow delete: if isSignedIn() && (
+        resource.data.senderId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ── notifications ─────────────────────────────────────────────────────────
+    match /notifications/{notifId} {
+      // User can read their own notifications
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      // System (server-side) or same user can create
+      allow create: if isSignedIn();
+
+      // User can mark their own as read
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      // User can delete their own notifications
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.fromId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ── boardGameSpots ────────────────────────────────────────────────────────
+    match /boardGameSpots/{spotId} {
+      // All signed-in users can read spots
+      allow read: if isSignedIn();
+
+      // Only admins can create or delete spots
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
+
+      // No spot editing (delete and re-add instead)
+      allow update: if false;
+    }
+  }
+}
