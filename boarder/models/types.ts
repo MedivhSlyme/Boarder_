@@ -25,6 +25,7 @@ export interface User {
   profile_details: ProfileDetails;
   friends?: string[];
   isAdmin?: boolean;
+  theme?: 'teal' | 'coral' | 'gems' | 'nightblue';
 }
 
 export interface Message {
@@ -34,6 +35,9 @@ export interface Message {
   receiverId: string;
   text: string;
   timestamp: number;
+  isVoiceMessage?: boolean;
+  voiceUrl?: string;
+  voiceDuration?: number;
 }
 
 export interface NearbyPlayer {
@@ -91,6 +95,21 @@ export interface BoardGameSpot {
   imageUrl?: string;
   createdBy: string;
   createdAt: number;
+  isEvent?: boolean;
+  eventDate?: number;
+  eventDetails?: string;
+}
+
+export interface EventNotification {
+  id: string;
+  spotId: string;
+  spotName: string;
+  eventDate: number;
+  createdAt: number;
+  createdBy: string;
+  category: BoardGameSpotCategory;
+  location: { lat: number; lng: number };
+  description: string;
 }
 
 export const DEFAULT_PROFILE_DETAILS: ProfileDetails = {
