@@ -8,6 +8,10 @@ import {
   serverTimestamp,
   where,
   or,
+  updateDoc,
+  doc,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { Message } from '../models/types';
@@ -17,6 +21,7 @@ interface MessagesContextType {
   messages: Message[];
   sendMessage: (recipientId: string, text: string) => Promise<void>;
   getConversation: (otherId: string) => Message[];
+  deleteConversation: (otherId: string) => Promise<void>;
 }
 
 const MessagesContext = createContext<MessagesContextType | null>(null);
@@ -26,7 +31,7 @@ function pairId(a: string, b: string) {
 }
 
 export function MessagesProvider({ children }: { children: ReactNode }) {
-  const { currentUser } = useAuth();
+  const { currentUser, firebaseUser } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
 
   useEffect(() => {
@@ -44,14 +49,21 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       snap.forEach((d) => {
         const data = d.data() as any;
         const ts = data.timestamp?.toMillis ? data.timestamp.toMillis() : data.timestamp ?? Date.now();
-        out.push({
-          id: d.id,
-          conversationId: data.conversationId,
-          senderId: data.senderId,
-          receiverId: data.receiverId,
-          text: data.text,
-          timestamp: ts,
-        });
+        // Filter out conversations hidden by current user
+        const hiddenConversations = data.hiddenBy || [];
+        if (!hiddenConversations.includes(currentUser.id)) {
+          out.push({
+            id: d.id,
+            conversationId: data.conversationId,
+            senderId: data.senderId,
+            receiverId: data.receiverId,
+            text: data.text,
+            timestamp: ts,
+            isVoiceMessage: data.isVoiceMessage || false,
+            voiceUrl: data.voiceUrl,
+            voiceDuration: data.voiceDuration,
+          });
+        }
       });
       setMessages(out);
     });
@@ -59,13 +71,15 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   }, [currentUser?.id]);
 
   const sendMessage = async (recipientId: string, text: string) => {
-    if (!currentUser) return;
+    if (!currentUser || !firebaseUser) return;
     await addDoc(collection(db, 'messages'), {
       conversationId: pairId(currentUser.id, recipientId),
       senderId: currentUser.id,
       receiverId: recipientId,
       text,
       timestamp: serverTimestamp(),
+      hiddenBy: [],
+      isVoiceMessage: false,
     });
   };
 
@@ -75,8 +89,23 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     return messages.filter((m) => m.conversationId === cid).sort((a, b) => b.timestamp - a.timestamp);
   };
 
+  const deleteConversation = async (otherId: string) => {
+    if (!currentUser || !firebaseUser) return;
+    const conversationId = pairId(currentUser.id, otherId);
+
+    // Create a hidden conversation record instead of deleting
+    // This marks the conversation as hidden for the current user only
+    const hiddenConversationsRef = doc(db, 'users', currentUser.id);
+    await updateDoc(hiddenConversationsRef, {
+      hiddenConversations: arrayUnion(conversationId),
+    }).catch(async () => {
+      // If field doesn't exist, it will be created by arrayUnion
+      // But we catch in case of other errors
+    });
+  };
+
   return (
-    <MessagesContext.Provider value={{ messages, sendMessage, getConversation }}>
+    <MessagesContext.Provider value={{ messages, sendMessage, getConversation, deleteConversation }}>
       {children}
     </MessagesContext.Provider>
   );
