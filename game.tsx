@@ -13,21 +13,21 @@ import {
   Grid, CellState,
 } from '../../lib/gameLogic';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 type Phase = 'placement' | 'battle' | 'gameover';
 type Turn = 'player' | 'cpu';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // Cell size — scales to fit screen
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 const CELL = Platform.OS === 'web' ? 36 : 28;
 const GRID_PX = CELL * GRID;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // Explosion animation per cell
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 function useFlash() {
   const anim = useRef(new Animated.Value(0)).current;
   const flash = () => {
@@ -37,9 +37,9 @@ function useFlash() {
   return { anim, flash };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // Single cell component
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 interface CellProps {
   state: CellState;
   isPreview?: boolean;
@@ -110,17 +110,17 @@ function Cell({ state, isPreview, isPreviewValid, onPress, flashAnim, showShip }
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // Sunk piece overlay data
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 interface SunkOverlay {
   piece: PlacedPiece;
   def: PieceDef;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // Grid component
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 interface GridViewProps {
   grid: Grid;
   onCellPress?: (r: number, c: number) => void;
@@ -131,9 +131,10 @@ interface GridViewProps {
   label: string;
   colors: any;
   sunkOverlays?: SunkOverlay[];
+  isActive?: boolean;
 }
 
-function GridView({ grid, onCellPress, previewCells, previewValid, showShips, flashCell, label, colors, sunkOverlays }: GridViewProps) {
+function GridView({ grid, onCellPress, previewCells, previewValid, showShips, flashCell, label, colors, sunkOverlays, isActive }: GridViewProps) {
   const { anim, flash: triggerFlash } = useFlash();
 
   React.useEffect(() => {
@@ -145,7 +146,13 @@ function GridView({ grid, onCellPress, previewCells, previewValid, showShips, fl
   return (
     <View>
       <Text style={[styles.gridLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      <View style={[styles.gridBorder, { borderColor: colors.border }]}>
+      <View style={[
+        styles.gridBorder,
+        {
+          borderColor: isActive ? colors.accent : colors.border,
+          borderWidth: isActive ? 3 : 1,
+        }
+      ]}>
         {Array.from({ length: GRID }, (_, r) => (
           <View key={r} style={styles.row}>
             {Array.from({ length: GRID }, (_, c) => {
@@ -239,9 +246,9 @@ function GridView({ grid, onCellPress, previewCells, previewValid, showShips, fl
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // Piece tray item
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 interface PieceTrayItemProps {
   piece: PieceDef;
   placed: boolean;
@@ -272,9 +279,9 @@ function PieceTrayItem({ piece, placed, selected, onSelect, colors }: PieceTrayI
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // Helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 function buildSunkOverlays(pieces: PlacedPiece[]): SunkOverlay[] {
   return pieces
     .filter(p => p.sunk)
@@ -285,24 +292,24 @@ function buildSunkOverlays(pieces: PlacedPiece[]): SunkOverlay[] {
     .filter(Boolean) as SunkOverlay[];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // Main screen
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 export default function GameTab() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === 'web' ? insets.top + 67 : insets.top + 20;
 
-  // ── Phase & turn ────────────────────────────────────────────────────────────
+  // ── Phase & turn ────────────────────────────────────────────────────────[...]
   const [phase, setPhase] = useState<Phase>('placement');
   const [turn, setTurn] = useState<Turn>('player');
   const [winner, setWinner] = useState<Turn | null>(null);
 
-  // ── Grids ────────────────────────────────────────────────────────────────────
+  // ── Grids ───────────────────────────────────────────────────────────[...]
   const [playerGrid, setPlayerGrid] = useState<Grid>(emptyGrid);
   const [cpuGrid, setCpuGrid] = useState<Grid>(emptyGrid);
 
-  // ── Placed pieces ─────────────────────────────────────────────────────────
+  // ── Placed pieces ────────────────────────────────────────────────────────[...]
   const [playerPieces, setPlayerPieces] = useState<PlacedPiece[]>([]);
   const [cpuPieces, setCpuPieces] = useState<PlacedPiece[]>([]);
 
@@ -316,7 +323,7 @@ export default function GameTab() {
   const [playerFlash, setPlayerFlash] = useState<[number, number] | null>(null);
   const [cpuFlash, setCpuFlash] = useState<[number, number] | null>(null);
 
-  // ── Status message ─────────────────────────────────────────────────────────
+  // ── Status message ────────────────────────────────────────────────────────[...]
   const [status, setStatus] = useState('Place your pieces on your grid.');
 
   // ── Miss streak counters (refs to avoid stale closures in setTimeout) ──────
@@ -329,9 +336,9 @@ export default function GameTab() {
     : [];
   const previewValid = previewCells.length > 0 && canPlace(playerGrid, previewCells);
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────[...]
   // CPU attack chain — all params passed explicitly to dodge stale closures
-  // ─────────────────────────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────[...]
 
   // Forward-declare via ref so the functions can call each other
   const cpuAttackRef = useRef<(pGrid: Grid, pPieces: PlacedPiece[]) => void>(null!);
@@ -466,7 +473,7 @@ export default function GameTab() {
     }
   }, [phase, selectedPiece, rotate, playerGrid, placedIds]);
 
-  // ── Start battle ──────────────────────────────────────────────────────────
+  // ── Start battle ────────────────────────────────────────────────────────[...]
   const handleStartBattle = useCallback(() => {
     const [cGrid, cPieces] = randomPlacement();
     setCpuGrid(cGrid);
@@ -526,7 +533,7 @@ export default function GameTab() {
     }
   }, [phase, turn, cpuGrid, cpuPieces, playerGrid, playerPieces]);
 
-  // ── Reset game ────────────────────────────────────────────────────────────
+  // ── Reset game ─────────────────────────────────────────────────────────[...]
   const handleReset = useCallback(() => {
     setPhase('placement');
     setTurn('player');
@@ -666,6 +673,7 @@ export default function GameTab() {
               label="ENEMY GRID — tap to attack"
               colors={colors}
               sunkOverlays={cpuSunkOverlays}
+              isActive={turn === 'player'}
             />
           </View>
 
@@ -680,6 +688,7 @@ export default function GameTab() {
               label="YOUR GRID"
               colors={colors}
               sunkOverlays={playerSunkOverlays}
+              isActive={turn === 'cpu'}
             />
           </View>
 
@@ -745,9 +754,9 @@ export default function GameTab() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 // Styles
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────[...]
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, marginBottom: 8 },
